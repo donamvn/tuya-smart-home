@@ -1,6 +1,36 @@
 import { NextResponse } from 'next/server';
 import { getTuyaContext } from '@/lib/tuya';
 
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: deviceId } = await params;
+    const ctx = getTuyaContext();
+
+    const res = await ctx.request({
+      method: 'DELETE',
+      path: `/v1.0/devices/${deviceId}`,
+    });
+
+    if (res.success) {
+      return NextResponse.json({ success: true, msg: 'Đã xóa thiết bị' });
+    }
+
+    return NextResponse.json(
+      { success: false, msg: res.msg || 'Không thể xóa thiết bị' },
+      { status: 400 }
+    );
+  } catch (error) {
+    console.error('Error deleting device:', error);
+    return NextResponse.json(
+      { success: false, msg: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -13,15 +43,15 @@ export async function GET(
     const [detailRes, statusRes, functionsRes] = await Promise.all([
       ctx.request({
         method: 'GET',
-        path: `/v1.0/iot-03/devices/${deviceId}`,
+        path: `/v1.0/devices/${deviceId}`,
       }),
       ctx.request({
         method: 'GET',
-        path: `/v1.0/iot-03/devices/${deviceId}/status`,
+        path: `/v1.0/devices/${deviceId}/status`,
       }),
       ctx.request({
         method: 'GET',
-        path: `/v1.0/iot-03/devices/${deviceId}/functions`,
+        path: `/v1.0/devices/${deviceId}/functions`,
       }),
     ]);
 

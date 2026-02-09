@@ -12,7 +12,7 @@ export async function POST(
 
     const res = await ctx.request({
       method: 'POST',
-      path: `/v1.0/iot-03/devices/${deviceId}/commands`,
+      path: `/v1.0/devices/${deviceId}/commands`,
       body: { commands: body.commands },
     });
 

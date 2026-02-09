@@ -103,6 +103,17 @@ export default function Dashboard() {
     }
   };
 
+  const handleDelete = async (deviceId: string) => {
+    const res = await fetch(`/api/devices/${deviceId}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+      setDevices((prev) => prev.filter((d) => d.device.id !== deviceId));
+      setSelectedDevice(null);
+    } else {
+      throw new Error(data.msg);
+    }
+  };
+
   // Get unique categories
   const categories = Array.from(new Set(devices.map((d) => d.device.category)));
 
@@ -291,6 +302,7 @@ export default function Dashboard() {
           deviceId={selectedDevice}
           onClose={() => setSelectedDevice(null)}
           onCommand={handleCommand}
+          onDelete={handleDelete}
         />
       )}
     </div>

@@ -115,7 +115,7 @@ async function sendDeviceCommand(
     const ctx = getTuyaContext();
     const res = await ctx.request({
       method: 'POST',
-      path: `/v1.0/iot-03/devices/${deviceId}/commands`,
+      path: `/v1.0/devices/${deviceId}/commands`,
       body: { commands },
     });
     return { success: !!res.success, msg: res.msg as string | undefined };

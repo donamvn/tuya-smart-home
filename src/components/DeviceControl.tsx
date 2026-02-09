@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { X, Power, Loader2, RefreshCw } from 'lucide-react';
+import { X, Power, Loader2, RefreshCw, Trash2 } from 'lucide-react';
 import { DeviceDetail, DeviceStatus, DeviceFunction } from '@/lib/types';
 import { CATEGORY_NAMES, CATEGORY_ICONS } from '@/lib/tuya';
 
@@ -9,6 +9,7 @@ interface DeviceControlProps {
   deviceId: string;
   onClose: () => void;
   onCommand: (deviceId: string, commands: { code: string; value: unknown }[]) => Promise<void>;
+  onDelete?: (deviceId: string) => Promise<void>;
 }
 
 function parseFunctionValues(values: string): Record<string, unknown> {
@@ -145,10 +146,11 @@ function FunctionControl({
   return null;
 }
 
-export default function DeviceControl({ deviceId, onClose, onCommand }: DeviceControlProps) {
+export default function DeviceControl({ deviceId, onClose, onCommand, onDelete }: DeviceControlProps) {
   const [detail, setDetail] = useState<DeviceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchDetail = useCallback(async () => {
@@ -286,6 +288,33 @@ export default function DeviceControl({ deviceId, onClose, onCommand }: DeviceCo
                 {deviceDetail?.model && <p>Model: {deviceDetail.model}</p>}
                 <p>Cập nhật: {deviceDetail?.update_time ? new Date(deviceDetail.update_time * 1000).toLocaleString('vi-VN') : 'N/A'}</p>
               </div>
+
+              {/* Delete button for offline devices */}
+              {!deviceDetail?.online && onDelete && (
+                <button
+                  onClick={async () => {
+                    if (!confirm(`Xóa thiết bị "${deviceDetail?.name}"? Thiết bị sẽ bị gỡ khỏi tài khoản Tuya.`)) return;
+                    setDeleting(true);
+                    try {
+                      await onDelete(deviceId);
+                      onClose();
+                    } catch {
+                      setError('Không thể xóa thiết bị');
+                    } finally {
+                      setDeleting(false);
+                    }
+                  }}
+                  disabled={deleting}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm font-medium hover:bg-red-100 transition-colors disabled:opacity-50"
+                >
+                  {deleting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                  Xóa thiết bị offline
+                </button>
+              )}
             </>
           )}
         </div>
