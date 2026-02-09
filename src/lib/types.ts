@@ -59,3 +59,34 @@ export interface Room {
   room_id: number;
   name: string;
 }
+
+// Scenario types
+export interface ScenarioAction {
+  deviceId: string;
+  deviceName: string;
+  commands: { code: string; value: unknown }[];
+  delayMinutes: number; // 0 = immediate, >0 = delay after scenario starts
+}
+
+export interface Scenario {
+  id: string;
+  name: string;
+  description: string;
+  enabled: boolean;
+  intervalHours: number; // run every X hours
+  durationMinutes: number; // how long the "on" action lasts before auto-off
+  actions: ScenarioAction[];
+  lastRun: string | null; // ISO timestamp
+  nextRun: string | null;
+  createdAt: string;
+}
+
+export interface ScenarioLog {
+  id: string;
+  scenarioId: string;
+  scenarioName: string;
+  action: string;
+  timestamp: string;
+  success: boolean;
+  message: string;
+}

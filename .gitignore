@@ -35,6 +35,9 @@ yarn-error.log*
 .env.development
 .env.production
 
+# scenario data
+/data/
+
 # vercel
 .vercel
 

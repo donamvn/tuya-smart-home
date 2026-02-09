@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, Home, Loader2, Search, Wifi, WifiOff } from 'lucide-react';
+import { RefreshCw, Home, Loader2, Search, Wifi, WifiOff, LayoutGrid, Zap } from 'lucide-react';
 import DeviceCard from './DeviceCard';
 import DeviceControl from './DeviceControl';
+import QuickActions from './QuickActions';
+import ScenarioPanel from './ScenarioPanel';
 import { TuyaDevice, DeviceStatus } from '@/lib/types';
 import { CATEGORY_NAMES } from '@/lib/tuya';
 
@@ -21,6 +23,7 @@ export default function Dashboard() {
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterOnline, setFilterOnline] = useState<string>('all');
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [activeTab, setActiveTab] = useState<'devices' | 'scenarios'>('devices');
 
   const fetchDevices = useCallback(async () => {
     try {
@@ -172,6 +175,43 @@ export default function Dashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        {/* Quick Actions Strip */}
+        <QuickActions devices={devices} onToggle={handleToggle} />
+
+        {/* Tabs */}
+        <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit">
+          <button
+            onClick={() => setActiveTab('devices')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              activeTab === 'devices'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <LayoutGrid className="w-4 h-4" />
+            Thiết bị ({devices.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('scenarios')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              activeTab === 'scenarios'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Zap className="w-4 h-4" />
+            Kịch bản
+          </button>
+        </div>
+
+        {/* Scenarios Tab */}
+        {activeTab === 'scenarios' && (
+          <ScenarioPanel devices={devices} />
+        )}
+
+        {/* Devices Tab */}
+        {activeTab === 'devices' && (
+        <>
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
           <div className="relative flex-1">
@@ -255,6 +295,8 @@ export default function Dashboard() {
           <p className="text-center text-xs text-gray-400 mt-8">
             Cập nhật lần cuối: {lastUpdate.toLocaleString('vi-VN')} · Tự động làm mới mỗi 30 giây
           </p>
+        )}
+        </>
         )}
       </main>
 
