@@ -6,7 +6,7 @@ import {
   Timer, Zap, History, ChevronDown, ChevronUp, AlertCircle, Pencil,
   Cloud, HardDrive, RefreshCw,
 } from 'lucide-react';
-import { Scenario, ScenarioLog, TuyaDevice, CloudScene } from '@/lib/types';
+import { Scenario, ScenarioLog, TuyaDevice, CloudScene, Automation } from '@/lib/types';
 
 interface ScenarioPanelProps {
   devices: { device: TuyaDevice }[];
@@ -33,7 +33,7 @@ function timeUntil(isoStr: string): string {
 }
 
 export default function ScenarioPanel({ devices }: ScenarioPanelProps) {
-  const [activeTab, setActiveTab] = useState<'cloud' | 'local'>('cloud');
+  const [activeTab, setActiveTab] = useState<'cloud' | 'automation' | 'local'>('cloud');
 
   // Local scenarios state
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
@@ -66,6 +66,11 @@ export default function ScenarioPanel({ devices }: ScenarioPanelProps) {
     { type: 'dpIssue', deviceId: '', code: 'switch_1', value: 'true', delayH: 0, delayM: 0, delayS: 5 },
   ]);
   const [deviceFunctions, setDeviceFunctions] = useState<Record<string, { code: string; name: string; type: string }[]>>({});
+
+  // Automations state
+  const [automations, setAutomations] = useState<Automation[]>([]);
+  const [autoLoading, setAutoLoading] = useState(true);
+  const [autoError, setAutoError] = useState<string | null>(null);
 
   // Local form state (shared for create & edit)
   const [formName, setFormName] = useState('');
@@ -110,15 +115,35 @@ export default function ScenarioPanel({ devices }: ScenarioPanelProps) {
     }
   }, []);
 
+  // ---- Fetch Automations ----
+  const fetchAutomations = useCallback(async () => {
+    setAutoLoading(true);
+    setAutoError(null);
+    try {
+      const res = await fetch('/api/automations');
+      const data = await res.json();
+      if (data.success) {
+        setAutomations(data.result || []);
+      } else {
+        setAutoError(data.msg || 'Không thể tải automation');
+      }
+    } catch {
+      setAutoError('Lỗi kết nối');
+    } finally {
+      setAutoLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchScenarios();
     fetchCloudScenes();
+    fetchAutomations();
     const interval = setInterval(async () => {
       await fetch('/api/scenarios/check', { method: 'POST' });
       fetchScenarios();
     }, 30000);
     return () => clearInterval(interval);
-  }, [fetchScenarios, fetchCloudScenes]);
+  }, [fetchScenarios, fetchCloudScenes, fetchAutomations]);
 
   // ---- Local Scenario Handlers ----
   const handleToggle = async (id: string) => {
@@ -234,6 +259,55 @@ export default function ScenarioPanel({ devices }: ScenarioPanelProps) {
       }
       await fetchScenarios();
       resetForm();
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // ---- Automation Handlers ----
+  const handleAutoToggle = async (id: string, currentEnabled: boolean) => {
+    setActionLoading(`auto-toggle-${id}`);
+    try {
+      const res = await fetch(`/api/automations/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: !currentEnabled }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchAutomations();
+      } else {
+        alert(data.msg || 'Không thể cập nhật');
+      }
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleAutoTrigger = async (id: string) => {
+    setActionLoading(`auto-trigger-${id}`);
+    try {
+      const res = await fetch(`/api/automations/${id}`, { method: 'POST' });
+      const data = await res.json();
+      if (!data.success) {
+        alert(data.msg || 'Không thể kích hoạt');
+      }
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleAutoDelete = async (id: string) => {
+    if (!confirm('Xóa automation? Thao tác này không thể hoàn tác.')) return;
+    setActionLoading(`auto-del-${id}`);
+    try {
+      const res = await fetch(`/api/automations/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        await fetchAutomations();
+      } else {
+        alert(data.msg || 'Không thể xóa');
+      }
     } finally {
       setActionLoading(null);
     }
@@ -402,7 +476,7 @@ export default function ScenarioPanel({ devices }: ScenarioPanelProps) {
             Kịch bản
           </h2>
           <p className="text-sm text-gray-500 mt-0.5">
-            {cloudScenes.length} cloud · {scenarios.filter((s) => s.enabled).length}/{scenarios.length} local
+            {cloudScenes.length} cloud · {automations.length} auto · {scenarios.filter((s) => s.enabled).length}/{scenarios.length} local
           </p>
         </div>
         <div className="flex gap-2">
@@ -416,7 +490,7 @@ export default function ScenarioPanel({ devices }: ScenarioPanelProps) {
         </div>
       </div>
 
-      {/* Sub-tabs: Cloud / Local */}
+      {/* Sub-tabs: Cloud / Automation / Local */}
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
         <button
           onClick={() => setActiveTab('cloud')}
@@ -428,6 +502,17 @@ export default function ScenarioPanel({ devices }: ScenarioPanelProps) {
         >
           <Cloud className="w-3.5 h-3.5" />
           Cloud ({cloudScenes.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('automation')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+            activeTab === 'automation'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <Timer className="w-3.5 h-3.5" />
+          Automation ({automations.length})
         </button>
         <button
           onClick={() => setActiveTab('local')}
@@ -701,6 +786,162 @@ export default function ScenarioPanel({ devices }: ScenarioPanelProps) {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ============ AUTOMATION TAB ============ */}
+      {activeTab === 'automation' && (
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            <button
+              onClick={fetchAutomations}
+              disabled={autoLoading}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm text-gray-600 hover:bg-gray-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${autoLoading ? 'animate-spin' : ''}`} />
+              Làm mới
+            </button>
+          </div>
+
+          {autoLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+            </div>
+          ) : autoError ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+              <p className="text-amber-800 text-sm font-medium flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
+                {autoError}
+              </p>
+            </div>
+          ) : automations.length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
+              <Timer className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500">Chưa có automation nào</p>
+              <p className="text-sm text-gray-400 mt-1">Tạo automation từ app Tuya Smart trên điện thoại</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {automations.map((auto) => {
+                const DAY_LABELS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+                return (
+                  <div
+                    key={auto.id}
+                    className={`bg-white rounded-xl border p-4 transition-all shadow-sm ${
+                      auto.enabled ? 'border-emerald-200' : 'border-gray-200 opacity-70'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <Timer className="w-4 h-4 text-emerald-500 shrink-0" />
+                          <h3 className="font-semibold text-gray-900 truncate">{auto.name}</h3>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                            auto.enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
+                          }`}>
+                            {auto.enabled ? 'Đang bật' : 'Đã tắt'}
+                          </span>
+                        </div>
+
+                        {/* Conditions */}
+                        {auto.conditions && auto.conditions.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {auto.conditions.map((cond, i) => (
+                              <div key={i} className="text-xs text-gray-500 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                {cond.entity_type === 6 ? (
+                                  <>
+                                    <Clock className="w-3 h-3 inline" />
+                                    {' '}{cond.display?.time || '??:??'}
+                                    {cond.display?.loops && cond.display.loops !== '0000000' && (
+                                      <span className="ml-1 text-gray-400">
+                                        ({cond.display.loops === '1111111'
+                                          ? 'Mỗi ngày'
+                                          : cond.display.loops.split('').map((c, j) => c === '1' ? DAY_LABELS[j] : '').filter(Boolean).join(', ')
+                                        })
+                                      </span>
+                                    )}
+                                  </>
+                                ) : cond.entity_type === 1 ? (
+                                  <>Thiết bị {cond.entity_id}: {cond.display?.code} {cond.display?.operator} {String(cond.display?.value ?? '')}</>
+                                ) : (
+                                  <>Điều kiện loại {cond.entity_type}</>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Actions */}
+                        {auto.actions && auto.actions.length > 0 && (
+                          <div className="mt-1.5 space-y-1">
+                            {auto.actions.map((action, i) => (
+                              <div key={i} className="text-xs text-gray-400 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-300" />
+                                {action.action_executor === 'dpIssue' ? (
+                                  <>
+                                    {action.entity_name || action.entity_id} →{' '}
+                                    {Object.entries(action.executor_property).map(([k, v]) =>
+                                      `${k}: ${v === true ? 'BẬT' : v === false ? 'TẮT' : String(v)}`
+                                    ).join(', ')}
+                                  </>
+                                ) : action.action_executor === 'delay' ? (
+                                  <>Trì hoãn {action.executor_property.minutes || 0}p {action.executor_property.seconds || 0}s</>
+                                ) : (
+                                  <>{action.action_executor}: {action.entity_id}</>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => handleAutoTrigger(auto.id)}
+                          disabled={actionLoading === `auto-trigger-${auto.id}`}
+                          className="p-2 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors"
+                          title="Chạy ngay"
+                        >
+                          {actionLoading === `auto-trigger-${auto.id}` ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Play className="w-4 h-4" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handleAutoToggle(auto.id, auto.enabled)}
+                          disabled={actionLoading === `auto-toggle-${auto.id}`}
+                          className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                          title={auto.enabled ? 'Tắt automation' : 'Bật automation'}
+                        >
+                          {actionLoading === `auto-toggle-${auto.id}` ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
+                          ) : auto.enabled ? (
+                            <ToggleRight className="w-5 h-5 text-green-600" />
+                          ) : (
+                            <ToggleLeft className="w-5 h-5 text-gray-400" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handleAutoDelete(auto.id)}
+                          disabled={actionLoading === `auto-del-${auto.id}`}
+                          className="p-2 rounded-lg hover:bg-red-50 text-red-500 transition-colors"
+                          title="Xóa"
+                        >
+                          {actionLoading === `auto-del-${auto.id}` ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

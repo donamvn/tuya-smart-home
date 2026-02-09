@@ -101,9 +101,38 @@ export interface CloudSceneAction {
 
 export interface CloudScene {
   id: string;
+  scene_id?: string;
   name: string;
   enabled: boolean;
   background: string;
   actions: CloudSceneAction[];
-  status: number; // 1 = enabled, 2 = disabled
+  status: number | string; // 1 = enabled, 2 = disabled
+}
+
+// Automation types (from Tuya API)
+export interface AutomationCondition {
+  entity_id: string;
+  entity_type: number; // 1 = device status, 6 = timer
+  order_num: number;
+  display: {
+    code?: string;
+    operator?: string;
+    value?: unknown;
+    date?: string;
+    time?: string;
+    loops?: string; // '1111111' = every day, each char = Mon-Sun
+    timezone_id?: string;
+  };
+}
+
+export interface Automation {
+  id: string;
+  automation_id?: string;
+  name: string;
+  enabled: boolean;
+  background: string;
+  match_type: number; // 1 = all conditions, 2 = any condition
+  conditions: AutomationCondition[];
+  preconditions: unknown[];
+  actions: CloudSceneAction[];
 }

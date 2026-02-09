@@ -19,7 +19,12 @@ export async function GET() {
     });
 
     if (res.success) {
-      return NextResponse.json({ success: true, result: res.result || [] });
+      // Tuya returns scene_id, map to id for consistency
+      const scenes = ((res.result || []) as Record<string, unknown>[]).map((s) => ({
+        ...s,
+        id: s.scene_id || s.id,
+      }));
+      return NextResponse.json({ success: true, result: scenes });
     }
 
     return NextResponse.json(
