@@ -90,3 +90,20 @@ export interface ScenarioLog {
   success: boolean;
   message: string;
 }
+
+// Cloud Scene types (from Tuya API)
+export interface CloudSceneAction {
+  action_executor: string; // 'dpIssue' | 'delay' | 'ruleEnable' | 'ruleDisable' | 'ruleTrigger'
+  entity_id: string;
+  entity_name?: string;
+  executor_property: Record<string, unknown>;
+}
+
+export interface CloudScene {
+  id: string;
+  name: string;
+  enabled: boolean;
+  background: string;
+  actions: CloudSceneAction[];
+  status: number; // 1 = enabled, 2 = disabled
+}
