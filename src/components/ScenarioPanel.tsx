@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Plus, Trash2, Play, Clock, Loader2, ToggleLeft, ToggleRight,
-  Timer, Zap, History, ChevronDown, ChevronUp, AlertCircle,
+  Timer, Zap, History, ChevronDown, ChevronUp, AlertCircle, Pencil,
 } from 'lucide-react';
 import { Scenario, ScenarioLog, TuyaDevice } from '@/lib/types';
 
@@ -35,11 +35,12 @@ export default function ScenarioPanel({ devices }: ScenarioPanelProps) {
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [logs, setLogs] = useState<ScenarioLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreate, setShowCreate] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Create form state
+  // Form state (shared for create & edit)
   const [formName, setFormName] = useState('');
   const [formDesc, setFormDesc] = useState('');
   const [formInterval, setFormInterval] = useState(3);
@@ -111,46 +112,82 @@ export default function ScenarioPanel({ devices }: ScenarioPanelProps) {
     }
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleEdit = (scenario: Scenario) => {
+    setEditingId(scenario.id);
+    setFormName(scenario.name);
+    setFormDesc(scenario.description);
+    setFormInterval(scenario.intervalHours);
+    setFormDuration(scenario.durationMinutes);
+    const firstAction = scenario.actions[0];
+    setFormDeviceId(firstAction?.deviceId || '');
+    setFormSwitchCode(firstAction?.commands[0]?.code || 'switch_1');
+    setShowForm(true);
+  };
+
+  const resetForm = () => {
+    setFormName('');
+    setFormDesc('');
+    setFormInterval(3);
+    setFormDuration(15);
+    setFormDeviceId('');
+    setFormSwitchCode('switch_1');
+    setEditingId(null);
+    setShowForm(false);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName || !formDeviceId) return;
 
     const selectedDevice = devices.find((d) => d.device.id === formDeviceId);
     const deviceName = selectedDevice?.device.name || formDeviceId;
+    const actions = [
+      {
+        deviceId: formDeviceId,
+        deviceName,
+        commands: [{ code: formSwitchCode, value: true }],
+        delayMinutes: 0,
+      },
+      {
+        deviceId: formDeviceId,
+        deviceName,
+        commands: [{ code: formSwitchCode, value: false }],
+        delayMinutes: formDuration,
+      },
+    ];
 
-    setActionLoading('create');
+    setActionLoading('submit');
     try {
-      await fetch('/api/scenarios', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formName,
-          description: formDesc,
-          intervalHours: formInterval,
-          durationMinutes: formDuration,
-          actions: [
-            {
-              deviceId: formDeviceId,
-              deviceName,
-              commands: [{ code: formSwitchCode, value: true }],
-              delayMinutes: 0,
-            },
-            {
-              deviceId: formDeviceId,
-              deviceName,
-              commands: [{ code: formSwitchCode, value: false }],
-              delayMinutes: formDuration,
-            },
-          ],
-        }),
-      });
+      if (editingId) {
+        // Update existing scenario
+        await fetch(`/api/scenarios/${editingId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'update',
+            name: formName,
+            description: formDesc,
+            intervalHours: formInterval,
+            durationMinutes: formDuration,
+            actions,
+          }),
+        });
+      } else {
+        // Create new scenario
+        await fetch('/api/scenarios', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: formName,
+            description: formDesc,
+            intervalHours: formInterval,
+            durationMinutes: formDuration,
+            actions,
+          }),
+        });
+      }
       await fetchScenarios();
-      setShowCreate(false);
-      setFormName('');
-      setFormDesc('');
-      setFormInterval(3);
-      setFormDuration(15);
-      setFormDeviceId('');
+      resetForm();
     } finally {
       setActionLoading(null);
     }
@@ -178,7 +215,7 @@ export default function ScenarioPanel({ devices }: ScenarioPanelProps) {
             Lịch sử
           </button>
           <button
-            onClick={() => setShowCreate(!showCreate)}
+            onClick={() => { resetForm(); setShowForm(true); }}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
           >
             <Plus className="w-4 h-4" />
@@ -187,10 +224,10 @@ export default function ScenarioPanel({ devices }: ScenarioPanelProps) {
         </div>
       </div>
 
-      {/* Create Form */}
-      {showCreate && (
-        <form onSubmit={handleCreate} className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
-          <h3 className="font-semibold text-gray-900">Tạo kịch bản mới</h3>
+      {/* Create / Edit Form */}
+      {showForm && (
+        <form onSubmit={handleSubmit} className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+          <h3 className="font-semibold text-gray-900">{editingId ? 'Sửa kịch bản' : 'Tạo kịch bản mới'}</h3>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -281,17 +318,17 @@ export default function ScenarioPanel({ devices }: ScenarioPanelProps) {
           <div className="flex gap-2">
             <button
               type="submit"
-              disabled={actionLoading === 'create'}
+              disabled={actionLoading === 'submit'}
               className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
             >
-              {actionLoading === 'create' ? (
+              {actionLoading === 'submit' ? (
                 <Loader2 className="w-4 h-4 animate-spin inline mr-1" />
               ) : null}
-              Tạo kịch bản
+              {editingId ? 'Lưu thay đổi' : 'Tạo kịch bản'}
             </button>
             <button
               type="button"
-              onClick={() => setShowCreate(false)}
+              onClick={resetForm}
               className="px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50"
             >
               Hủy
@@ -372,6 +409,13 @@ export default function ScenarioPanel({ devices }: ScenarioPanelProps) {
 
                 {/* Action buttons */}
                 <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    onClick={() => handleEdit(scenario)}
+                    className="p-2 rounded-lg hover:bg-amber-50 text-amber-600 transition-colors"
+                    title="Sửa kịch bản"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
                   <button
                     onClick={() => handleTrigger(scenario.id)}
                     disabled={actionLoading === `trigger-${scenario.id}`}

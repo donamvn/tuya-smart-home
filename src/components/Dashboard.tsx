@@ -114,6 +114,26 @@ export default function Dashboard() {
     }
   };
 
+  const handleRename = async (deviceId: string, newName: string) => {
+    const res = await fetch(`/api/devices/${deviceId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      setDevices((prev) =>
+        prev.map((d) =>
+          d.device.id === deviceId
+            ? { ...d, device: { ...d.device, name: newName } }
+            : d
+        )
+      );
+    } else {
+      throw new Error(data.msg);
+    }
+  };
+
   // Get unique categories
   const categories = Array.from(new Set(devices.map((d) => d.device.category)));
 
@@ -303,6 +323,7 @@ export default function Dashboard() {
           onClose={() => setSelectedDevice(null)}
           onCommand={handleCommand}
           onDelete={handleDelete}
+          onRename={handleRename}
         />
       )}
     </div>

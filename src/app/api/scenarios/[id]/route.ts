@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { toggleScenario, deleteScenario, triggerScenarioNow, getScenarioById } from '@/lib/scheduler';
+import { toggleScenario, deleteScenario, triggerScenarioNow, getScenarioById, updateScenario } from '@/lib/scheduler';
 
 export async function GET(
   request: Request,
@@ -36,6 +36,20 @@ export async function PATCH(
         return NextResponse.json({ success: false, msg: 'Không tìm thấy kịch bản' }, { status: 404 });
       }
       return NextResponse.json({ success: true, msg: 'Đã kích hoạt kịch bản' });
+    }
+
+    if (body.action === 'update') {
+      const updated = updateScenario(id, {
+        name: body.name,
+        description: body.description,
+        intervalHours: body.intervalHours,
+        durationMinutes: body.durationMinutes,
+        actions: body.actions,
+      });
+      if (!updated) {
+        return NextResponse.json({ success: false, msg: 'Không tìm thấy kịch bản' }, { status: 404 });
+      }
+      return NextResponse.json({ success: true, result: updated });
     }
 
     return NextResponse.json({ success: false, msg: 'Invalid action' }, { status: 400 });

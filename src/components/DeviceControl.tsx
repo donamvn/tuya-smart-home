@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { X, Power, Loader2, RefreshCw, Trash2 } from 'lucide-react';
+import { X, Power, Loader2, RefreshCw, Trash2, Pencil, Check } from 'lucide-react';
 import { DeviceDetail, DeviceStatus, DeviceFunction } from '@/lib/types';
 import { CATEGORY_NAMES, CATEGORY_ICONS } from '@/lib/tuya';
 
@@ -10,6 +10,7 @@ interface DeviceControlProps {
   onClose: () => void;
   onCommand: (deviceId: string, commands: { code: string; value: unknown }[]) => Promise<void>;
   onDelete?: (deviceId: string) => Promise<void>;
+  onRename?: (deviceId: string, newName: string) => Promise<void>;
 }
 
 function parseFunctionValues(values: string): Record<string, unknown> {
@@ -146,12 +147,15 @@ function FunctionControl({
   return null;
 }
 
-export default function DeviceControl({ deviceId, onClose, onCommand, onDelete }: DeviceControlProps) {
+export default function DeviceControl({ deviceId, onClose, onCommand, onDelete, onRename }: DeviceControlProps) {
   const [detail, setDetail] = useState<DeviceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [renaming, setRenaming] = useState(false);
 
   const fetchDetail = useCallback(async () => {
     setLoading(true);
@@ -190,6 +194,20 @@ export default function DeviceControl({ deviceId, onClose, onCommand, onDelete }
     return detail?.status?.find((s) => s.code === code)?.value;
   };
 
+  const handleRename = async () => {
+    if (!editName.trim() || !onRename) return;
+    setRenaming(true);
+    try {
+      await onRename(deviceId, editName.trim());
+      await fetchDetail();
+      setEditing(false);
+    } catch {
+      setError('Không thể đổi tên thiết bị');
+    } finally {
+      setRenaming(false);
+    }
+  };
+
   const deviceDetail = detail?.detail;
   const icon = deviceDetail ? (CATEGORY_ICONS[deviceDetail.category] || '📦') : '📦';
   const categoryName = deviceDetail
@@ -204,10 +222,47 @@ export default function DeviceControl({ deviceId, onClose, onCommand, onDelete }
       >
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-100 p-4 flex items-center justify-between rounded-t-2xl">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
             <span className="text-3xl">{icon}</span>
-            <div>
-              <h2 className="font-bold text-gray-900">{deviceDetail?.name || 'Đang tải...'}</h2>
+            <div className="flex-1 min-w-0">
+              {editing ? (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleRename()}
+                    className="flex-1 min-w-0 px-2 py-1 rounded-lg border border-blue-300 text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    autoFocus
+                  />
+                  <button
+                    onClick={handleRename}
+                    disabled={renaming}
+                    className="p-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {renaming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  </button>
+                  <button
+                    onClick={() => setEditing(false)}
+                    className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <h2 className="font-bold text-gray-900 truncate">{deviceDetail?.name || 'Đang tải...'}</h2>
+                  {onRename && deviceDetail && (
+                    <button
+                      onClick={() => { setEditName(deviceDetail.name); setEditing(true); }}
+                      className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 shrink-0"
+                      title="Đổi tên"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              )}
               <p className="text-sm text-gray-500">{categoryName}</p>
             </div>
           </div>
@@ -289,8 +344,8 @@ export default function DeviceControl({ deviceId, onClose, onCommand, onDelete }
                 <p>Cập nhật: {deviceDetail?.update_time ? new Date(deviceDetail.update_time * 1000).toLocaleString('vi-VN') : 'N/A'}</p>
               </div>
 
-              {/* Delete button for offline devices */}
-              {!deviceDetail?.online && onDelete && (
+              {/* Delete button */}
+              {onDelete && (
                 <button
                   onClick={async () => {
                     if (!confirm(`Xóa thiết bị "${deviceDetail?.name}"? Thiết bị sẽ bị gỡ khỏi tài khoản Tuya.`)) return;
@@ -312,7 +367,7 @@ export default function DeviceControl({ deviceId, onClose, onCommand, onDelete }
                   ) : (
                     <Trash2 className="w-4 h-4" />
                   )}
-                  Xóa thiết bị offline
+                  Xóa thiết bị
                 </button>
               )}
             </>
