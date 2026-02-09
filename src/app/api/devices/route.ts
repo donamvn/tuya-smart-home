@@ -1,43 +1,50 @@
 import { NextResponse } from 'next/server';
 import { getTuyaContext } from '@/lib/tuya';
 
+interface TuyaDeviceResponse {
+  devices: unknown[];
+  has_more: boolean;
+  last_row_key: string;
+  total: number;
+}
+
 export async function GET() {
   try {
     const ctx = getTuyaContext();
+    const allDevices: unknown[] = [];
+    let lastRowKey = '';
+    let hasMore = true;
 
-    // First, get the user list linked to this project
-    const usersRes = await ctx.request({
-      method: 'GET',
-      path: '/v1.0/token',
-      query: { grant_type: '1' },
-    });
+    // Paginate through all devices linked to this project
+    while (hasMore) {
+      const res = await ctx.request({
+        method: 'GET',
+        path: '/v1.0/iot-01/associated-users/devices',
+        query: {
+          page_no: '1',
+          page_size: '50',
+          last_row_key: lastRowKey,
+        },
+      });
 
-    // Get devices using the IoT Core API
-    const devicesRes = await ctx.request({
-      method: 'GET',
-      path: '/v2.0/cloud/thing/device',
-      query: { page_size: '100' },
-    });
+      if (!res.success || !res.result) {
+        if (allDevices.length > 0) break;
+        return NextResponse.json(
+          { success: false, msg: res.msg || 'Failed to fetch devices' },
+          { status: 500 }
+        );
+      }
 
-    if (devicesRes.success) {
-      return NextResponse.json(devicesRes);
+      const data = res.result as TuyaDeviceResponse;
+      allDevices.push(...(data.devices || []));
+      hasMore = data.has_more;
+      lastRowKey = data.last_row_key || '';
     }
 
-    // Fallback: try legacy endpoint
-    const legacyRes = await ctx.request({
-      method: 'GET',
-      path: '/v1.0/iot-03/devices',
-      query: { page_size: '100' },
+    return NextResponse.json({
+      success: true,
+      result: allDevices,
     });
-
-    if (legacyRes.success) {
-      return NextResponse.json(legacyRes);
-    }
-
-    return NextResponse.json(
-      { success: false, msg: legacyRes.msg || 'Failed to fetch devices' },
-      { status: 500 }
-    );
   } catch (error) {
     console.error('Error fetching devices:', error);
     return NextResponse.json(

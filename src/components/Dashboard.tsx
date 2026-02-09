@@ -31,29 +31,14 @@ export default function Dashboard() {
       const data = await res.json();
 
       if (data.success && data.result) {
-        // Handle different API response formats
-        let deviceList: TuyaDevice[] = [];
-        if (Array.isArray(data.result)) {
-          deviceList = data.result;
-        } else if (data.result.list) {
-          deviceList = data.result.list;
-        } else if (data.result.devices) {
-          deviceList = data.result.devices;
-        }
+        // API returns array of devices with embedded status
+        const deviceList = Array.isArray(data.result) ? data.result : [];
 
-        // Fetch status for each device
-        const devicesWithStatus: DeviceWithStatus[] = await Promise.all(
-          deviceList.map(async (device: TuyaDevice) => {
-            try {
-              const statusRes = await fetch(`/api/devices/${device.id}`);
-              const statusData = await statusRes.json();
-              return {
-                device,
-                status: statusData.success ? (statusData.result?.status || []) : [],
-              };
-            } catch {
-              return { device, status: [] };
-            }
+        // Status is already included in each device object from Tuya API
+        const devicesWithStatus: DeviceWithStatus[] = deviceList.map(
+          (raw: TuyaDevice & { status?: DeviceStatus[] }) => ({
+            device: raw,
+            status: raw.status || [],
           })
         );
 

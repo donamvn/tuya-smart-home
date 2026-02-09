@@ -57,6 +57,12 @@ export const CATEGORY_NAMES: Record<string, string> = {
   wg2: 'Gateway',
   mal: 'Khóa cửa',
   zndb: 'Bơm nước',
+  wnykq: 'Cảm biến nhiệt ẩm',
+  qt: 'Điều khiển IR',
+  infrared_box: 'IR Box',
+  infrared_tv: 'TV (IR)',
+  infrared_ac: 'Điều hòa (IR)',
+  infrared_amplifier: 'Ampli (IR)',
 };
 
 // Device icon mapping by category
@@ -89,4 +95,10 @@ export const CATEGORY_ICONS: Record<string, string> = {
   jtmspro: '🔒',
   wg2: '📡',
   mal: '🔒',
+  wnykq: '🌡️',
+  qt: '📡',
+  infrared_box: '📡',
+  infrared_tv: '📺',
+  infrared_ac: '❄️',
+  infrared_amplifier: '🔊',
 };
