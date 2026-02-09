@@ -6,6 +6,7 @@ import DeviceCard from './DeviceCard';
 import DeviceControl from './DeviceControl';
 import QuickActions from './QuickActions';
 import ScenarioPanel from './ScenarioPanel';
+import SensorDashboard from './SensorDashboard';
 import { TuyaDevice, DeviceStatus } from '@/lib/types';
 import { CATEGORY_NAMES } from '@/lib/tuya';
 
@@ -191,6 +192,9 @@ export default function Dashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        {/* Sensor Dashboard */}
+        <SensorDashboard devices={devices} />
+
         {/* Quick Actions Strip */}
         <QuickActions devices={devices} onToggle={handleToggle} />
 
